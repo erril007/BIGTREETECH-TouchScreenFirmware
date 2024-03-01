@@ -1,17 +1,11 @@
 #include "os_timer.h"
 #include "includes.h"
 
-typedef struct
-{
-  uint32_t ms;   // milliseconds
-  uint16_t sec;  // seconds
-} OS_COUNTER;
-
-volatile static OS_COUNTER os_counter = {0, 0};
+OS_COUNTER os_counter = {0, 1000};
 
 void OS_InitTimerMs(void)
 {
-#ifdef GD32F2XX
+#if defined(GD32F2XX) || defined(GD32F3XX)
   nvic_irq_enable(TIMER6_IRQn, 2U, 0U);
 
   rcu_periph_clock_enable(RCU_TIMER6);
@@ -38,7 +32,7 @@ void OS_InitTimerMs(void)
 #endif
 }
 
-#ifdef GD32F2XX
+#if defined(GD32F2XX) || defined(GD32F3XX)
 void TIMER6_IRQHandler(void)
 {
   if ((TIMER_INTF(TIMER6) & TIMER_INTF_UPIF) != 0)
@@ -46,15 +40,15 @@ void TIMER6_IRQHandler(void)
     TIMER_INTF(TIMER6) &= ~TIMER_INTF_UPIF;  // clear interrupt flag
 
     os_counter.ms++;
-    os_counter.sec++;
+    os_counter.sec--;
 
-    if (os_counter.sec >= 1000)  // if one second has been elapsed
+    if (os_counter.sec == 0)  // if one second has been elapsed
     {
-      os_counter.sec = 0;  // reset one second counter
+      os_counter.sec = 1000;  // reset one second counter
 
-      AVG_KPIS();          // collect debug monitoring KPI
+      AVG_KPIS();             // collect debug monitoring KPI
 
-      updatePrintTime();   // if printing, update printing info
+      updatePrintTime();      // if printing, update printing info
     }
 
     TS_CheckPress();  // check touch screen once a millisecond
@@ -68,27 +62,21 @@ void TIM7_IRQHandler(void)
     TIM7->SR &= ~TIM_SR_UIF;  // clear interrupt flag
 
     os_counter.ms++;
-    os_counter.sec++;
+    os_counter.sec--;
 
-    if (os_counter.sec >= 1000)  // if one second has been elapsed
+    if (os_counter.sec == 0)  // if one second has been elapsed
     {
-      os_counter.sec = 0;  // reset one second counter
+      os_counter.sec = 1000;  // reset one second counter
 
-      AVG_KPIS();          // collect debug monitoring KPI
+      AVG_KPIS();             // collect debug monitoring KPI
 
-      updatePrintTime();   // if printing, update printing info
+      updatePrintTime();      // if printing, update printing info
     }
 
     TS_CheckPress();  // check touch screen once a millisecond
   }
 }
 #endif
-
-// 1 ms
-uint32_t OS_GetTimeMs(void)
-{
-  return os_counter.ms;
-}
 
 // task: task structure to be filled
 // time_ms:
